@@ -1,63 +1,52 @@
 import './App.css';
-import { useEffect, useState } from 'react'
-import { BrowserRouter as Router, Route, Redirect } from 'react-router-dom'
+import { useState, Suspense, useRef } from 'react'
+import { BrowserRouter as Router, Route } from 'react-router-dom'
+import ArtistView from './components/ArtistView'
+import AlbumView from './components/AlbumView'
 import Gallery from './components/Gallery'
 import SearchBar from './components/SearchBar'
-import AlbumView from './components/AlbumView'
-import ArtistView from './components/ArtistView'
+import Spinner from './components/Spinner'
+import { DataContext } from './context/DataContext'
+import { SearchContext } from './context/SearchContext'
+import { createResource as fetchData } from './helper'
 
-function App() {
-  let [searchTerm, setSearchTerm] = useState('')
-  let [data, setData] = useState([])
+const App = () => {
+  let searchInput = useRef('')
+  let [data, setData] = useState(null)
   let [message, setMessage] = useState('Search for Music!')
-
-  const API_URL = `https://itunes.apple.com/search?term=`
-
-  function toTitleCase(str) {
-    return str.replace(
-      /\w\S*/g,
-      function(txt) {
-        return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
-      }
-    );
-  }
-
-  useEffect(() => {
-    if (searchTerm) {
-      document.title=`${searchTerm} Music`
-      const fetchData = async () => {
-        const response = await fetch(API_URL + searchTerm)
-        const resData = await response.json()
-        if(resData.results.length > 0) {
-          setData(resData.results)
-        } else {
-          setMessage('Not Found')
-        }
-      }
-      fetchData()
-  }
-  }, [searchTerm, API_URL])
 
   const handleSearch = (e, term) => {
     e.preventDefault()
-    term = toTitleCase(term)
-    setSearchTerm(term)
-    return (<Redirect to="/" />)
+    setData(fetchData(term, 'main'))
+  }
+
+  const renderGallery = () => {
+    if(data) {
+      return (
+        <Suspense fallback={<Spinner />}>
+          <Gallery />
+        </Suspense>
+      )
+    }
   }
 
   return (
     <div className="App">
       {message}
       <Router>
-        <Route exact path="/">
-          <SearchBar handleSearch={handleSearch} />
-          <Gallery data={data} />
+        <Route exact path={'/'}>
+          <SearchContext.Provider value={{term: searchInput, handleSearch: handleSearch}}>
+            <SearchBar />
+          </SearchContext.Provider>
+            <DataContext.Provider value={data}>
+              {renderGallery()}
+            </DataContext.Provider>
         </Route>
         <Route path="/album/:id">
-          <AlbumView term={searchTerm} />
+          <AlbumView />
         </Route>
         <Route path="/artist/:id">
-          <ArtistView term={searchTerm} />
+          <ArtistView />
         </Route>
       </Router>
     </div>
